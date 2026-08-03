@@ -1,18 +1,25 @@
 import React, { useState, useEffect } from "react";
-import { getExpenses, createExpense } from "../services/api";
-import { Expense, ExpenseFormData } from "../types";
+import {
+  getExpenses,
+  createExpense,
+  fetchCategories,
+} from "../services/api";
+import { Category, Expense, ExpenseFormData } from "../types";
 import YearNavigation from "../components/YearNavigation";
 import { MonthNavigation } from "../components/MonthNavigation";
 import CategoryBreakdown from "../components/CategoryBreakdown";
 import { CalendarExpenseTable } from "../components/CalendarExpenseTable";
 import { ExpenseForm } from "../components/ExpenseForm";
+import { AddCategoryModal } from "../components/AddCategoryModal";
 import { Modal, Button } from "../vibes";
 import { COLORS } from "../constants/colors";
 
 const HistoryPage: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenseCategories, setExpenseCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
   // Get year and month from URL params, default to current date if not provided
   const getInitialYearMonth = () => {
@@ -46,8 +53,18 @@ const HistoryPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    loadCategories();
     fetchExpenses();
   }, [selectedYear, selectedMonth]);
+
+  const loadCategories = async () => {
+    try {
+      const data = await fetchCategories();
+      setExpenseCategories(data);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    }
+  };
 
   const fetchExpenses = async () => {
     try {
@@ -59,6 +76,13 @@ const HistoryPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCategoryCreated = (category: Category) => {
+    setExpenseCategories((prev) => {
+      const existing = prev.some((c) => c.name === category.name);
+      return existing ? prev : [...prev, category].sort((a, b) => a.name.localeCompare(b.name));
+    });
   };
 
   const handleYearChange = (year: number) => {
@@ -148,9 +172,17 @@ const HistoryPage: React.FC = () => {
             onYearChange={handleYearChange}
           />
         </div>
-        <Button variant="primary" onClick={() => setIsModalOpen(true)}>
-          Add Expense
-        </Button>
+        <div style={{ display: "flex", gap: "0.75rem" }}>
+          <Button
+            variant="secondary"
+            onClick={() => setIsCategoryModalOpen(true)}
+          >
+            Add Category
+          </Button>
+          <Button variant="primary" onClick={() => setIsModalOpen(true)}>
+            Add Expense
+          </Button>
+        </div>
       </div>
 
       <MonthNavigation
@@ -172,6 +204,7 @@ const HistoryPage: React.FC = () => {
             <div style={{ marginTop: "32px" }}>
               <CalendarExpenseTable
                 expenses={expenses}
+                categories={expenseCategories}
                 onExpenseUpdated={fetchExpenses}
               />
             </div>
@@ -185,10 +218,17 @@ const HistoryPage: React.FC = () => {
         title="Add New Expense"
       >
         <ExpenseForm
+          categories={expenseCategories}
           onSubmit={handleAddExpense}
           onCancel={() => setIsModalOpen(false)}
         />
       </Modal>
+
+      <AddCategoryModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        onCategoryCreated={handleCategoryCreated}
+      />
     </div>
   );
 };
